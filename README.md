@@ -1,0 +1,4 @@
+Insight
+=======
+
+Coding challenge solution
