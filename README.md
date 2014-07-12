@@ -1,4 +1,4 @@
 Insight
 =======
 
-Coding Challenge solution
+Coding challenge solution
