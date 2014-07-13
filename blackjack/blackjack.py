@@ -126,7 +126,7 @@ class Dealer(object):
             print "Dealer: %s (%s points)" % \
                   (hand_view, self.hand.points)
         else:
-            print "Dealer: %s " % hand_view[:2]
+            print "Dealer: %s " % hand_view[:3]
 
 
 class Game(object):
@@ -148,7 +148,7 @@ class Game(object):
             self.continue_or_exit()
 
         print chr(27) + "[2J"
-        print "Thanks for playing!"
+        print "Thanks for playing!\n"
 
     def first_hand(self):
         self.player.hand.add_card(self.deck.deal_card())
@@ -206,16 +206,19 @@ class Game(object):
         self.dealer.hand = Hand()
         self.player.busted = False
         self.dealer.busted = False
-        self.dealer.turn = False
+        self.dealer.dealer_turn = False
 
     def continue_or_exit(self):
-        action = raw_input("Do you want to continue? (y/n) >> ") 
-        if action in ['y', 'yes']:
-            self.player.bet_input()
-        elif action in ['n', 'no']:
-            self.player.bet = 0
+        if self.player.chips > 0:
+            action = raw_input("Do you want to continue? (y/n) >> ") 
+            if action in ['y', 'yes']:
+                self.player.bet_input()
+            elif action in ['n', 'no']:
+                self.player.bet = 0
+            else:
+                self.continue_or_exit()
         else:
-            self.continue_or_exit()
+            time.sleep(2)
 
 
 if __name__ == "__main__":
