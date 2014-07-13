@@ -33,7 +33,7 @@ class Hand(object):
         hand_view = ''
         for card in self.cards:
             hand_view += '%s%s ' % (card[:-1], self.suits[card[-1]])
-        return hand_view, self.points
+        return hand_view
 
     def show_first_card(self):
         card = self.cards[0]
@@ -66,62 +66,67 @@ class Deck(object):
         return self.deck.pop()
 
 
-class Person(object):
+class Player(object):
     def __init__(self):
         self.hand = Hand()
         self.busted = False
-
-    def deal_card(self, card):
-        self.hand.add_card(card)
-        self.hand.show()
-
-    def deal_two_cards(self, deck):
-        self.hand.add_card(deck.deal_card())
-        self.hand.add_card(deck.deal_card())
-
-    def close_hand(self):
-        self.hand = Hand()
-        self.busted = False
-
-
-class Player(Person):
-    def __init__(self):
-        super(Player, self).__init__()
         self.chips = 100
         self.bet = 0
         self.action = 'stand'
-    
-    # check
-    def validate_bet(self, bet): 
-        if bet <= self.chips:
-            return bet
-        else: 
-            return self.bet_input("(not enough chips)")
+
+    def validate_bet(self, bet):
+        try:            
+            if int(bet) <= self.chips:
+                self.bet = int(bet)
+            else: 
+                self.bet_input("(not enough chips)")
+        except:
+            self.bet_input("(number)")
 
     def bet_input(self, message=''):
         print chr(27) + "[2J"
         print "Chips left: ", self.chips
         print "--------------------------------"
-        bet = raw_input("Your bet%s >>> " % message) # !!!! make safe
-        self.bet = self.validate_bet(bet)
-        return self.bet
+        bet = raw_input("Your bet %s >>> " % message) # !!!! make safe
+        self.validate_bet(bet)
+
+    def show_hand(self):
+        hand_view = self.hand.show()
+        print "You: %s (%s points)" % \
+                  (hand_view, self.hand.points)
 
     def check_hand(self):
+        message = ''
         if self.hand.points < 21:
-            self.action = raw_input("Your action: hit(h) / stand(s) >>> ")
-            message = ''
+            self.action_input() 
         elif self.hand.points > 21:
             self.action = 'stand'
-            message = "You're busted"
             self.busted = True
         else:
             self.action = 'stand'
-            message = "You've got BlackJack" # bj only 10+11
-        return message
 
-class Dealer(Person):
-    pass
+    def action_input(self):
+        action = raw_input("Your action: hit(h) / stand(s) >>> ")
+        if action.lower() in ['h', 'hit']:
+            self.action = 'hit'
+        elif action.lower() in ['s', 'stand']:
+            self.action = 'stand'
+        else:
+            self.action_input()
 
+class Dealer(object):
+    def __init__(self):
+        self.hand = Hand()
+        self.busted = False
+        self.dealer_turn = False
+
+    def show_hand(self):
+        hand_view = self.hand.show()
+        if self.dealer_turn:
+            print "Dealer: %s (%s points)" % \
+                  (hand_view, self.hand.points)
+        else:
+            print "Dealer: %s " % hand_view[:2]
 
 
 class Game(object):
@@ -139,59 +144,78 @@ class Game(object):
             if not self.player.busted:
                 self.dealer_move()
 
-            self.hand_end()
+            self.determine_winner()
             self.continue_or_exit()
 
+        print chr(27) + "[2J"
         print "Thanks for playing!"
 
     def first_hand(self):
-        self.player.deal_two_cards(self.deck)
-        self.dealer.deal_two_cards(self.deck)
+        self.player.hand.add_card(self.deck.deal_card())
+        self.player.hand.add_card(self.deck.deal_card())
+        self.dealer.hand.add_card(self.deck.deal_card())
+        self.dealer.hand.add_card(self.deck.deal_card())
         self.show_table()
     
 
     def show_table(self, message=''):
         print chr(27) + "[2J"
-        print "Your cards: %s (%s points)" % self.player.hand.show() 
+        self.player.show_hand()
         print ''
-        print "Dealer cards: %s (%s points)" % self.dealer.hand.show()
+        self.dealer.show_hand()
         print '\n', message, '\n'
-        print "Chips left: ", self.player.chips
+        print "Chips left: %d       " % (self.player.chips - self.player.bet),
+        print "Your bet: %d" % self.player.bet
         print "--------------------------------"
 
     def player_move(self):
         self.player.check_hand()
-        while self.player.action.lower() in ['h', 'hit']:
+        while self.player.action == 'hit':
             self.player.hand.add_card(self.deck.deal_card())
             self.show_table()
-            message = self.player.check_hand()
+            self.player.check_hand()
             
 
     def dealer_move(self):
         self.show_table()
+        time.sleep(1)
+        self.dealer.dealer_turn = True
+        self.show_table()
         while self.dealer.hand.points < 17 and not self.dealer.busted:
+            time.sleep(1)
             self.dealer.hand.add_card(self.deck.deal_card())
             self.show_table()
             if self.dealer.hand.points > 21:
                 self.dealer.busted = True
 
-    def hand_end(self):
+    def determine_winner(self):
         if self.player.busted or (not self.dealer.busted and\
                     self.player.hand.points <= self.dealer.hand.points):
             self.player.chips -= self.player.bet
-            self.show_table('You lost!')
+            message = 'You lost!'
         else:
             self.player.chips += self.player.bet
-            self.show_table('You won!')
+            message = 'You won!'
 
-        self.player.close_hand()
-        self.dealer.close_hand()
+        self.close_hand(message)
+
+    def close_hand(self, message):
+        self.player.bet = 0
+        self.show_table(message)
+        self.player.hand = Hand()
+        self.dealer.hand = Hand()
+        self.player.busted = False
+        self.dealer.busted = False
+        self.dealer.turn = False
 
     def continue_or_exit(self):
-        if raw_input("Do you want to continue? (y/n) >> ") in ['y', 'yes']:
-            self.player.bet_or_exit(self.player.bet_input()) #clumsy
-        else:
+        action = raw_input("Do you want to continue? (y/n) >> ") 
+        if action in ['y', 'yes']:
+            self.player.bet_input()
+        elif action in ['n', 'no']:
             self.player.bet = 0
+        else:
+            self.continue_or_exit()
 
 
 if __name__ == "__main__":
