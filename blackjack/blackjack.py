@@ -22,7 +22,7 @@ class Game(object):
             self.determine_winner()
             self.continue_or_exit()
 
-        print chr(27) + "[2J"
+        print chr(27) + "[2J" # clears screen
         print "Thanks for playing!\n"
 
     def first_hand(self):
@@ -32,7 +32,6 @@ class Game(object):
         self.dealer.hand.add_card(self.deck.deal_card())
         self.show_table()
     
-
     def player_move(self):
         self.player.check_hand()
         while self.player.action == 'hit':
@@ -40,7 +39,6 @@ class Game(object):
             self.show_table()
             self.player.check_hand()
             
-
     def dealer_move(self):
         self.show_table()
         time.sleep(1)
@@ -98,7 +96,7 @@ class Game(object):
             time.sleep(2)
 
     def show_table(self, message=''):
-        print chr(27) + "[2J"
+        print chr(27) + "[2J" # clears screen
         self.player.show_hand()
         print ''
         self.dealer.show_hand()
@@ -123,7 +121,6 @@ class Deck(object):
             for suit in self.card_suits:
                 deck += [name + suit]
         return deck * self.number_of_52card_decks
-
 
     def shuffle(self):
         self.deck = self.initialize_deck()
@@ -180,6 +177,7 @@ class Player(object):
             self.action = 'stand'
         else:
             self.action_input()
+
 
 class Dealer(object):
     def __init__(self):
