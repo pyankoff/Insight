@@ -3,44 +3,109 @@ import sys
 import time
 
 
-class Hand(object):
-    card_points = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, 
-                   '7': 7, '8': 8, '9': 9, '10': 10, 
-                   'J': 10, 'Q': 10, 'K': 10, 'A': 11}
-
-    suits = {'s': u"\u2660",
-             'h': u"\u2661",
-             'd': u"\u2662",
-             'c': u"\u2663"}
-
+class Game(object):
     def __init__(self):
-        self.cards = []
-        self.points = 0
-        self.blackjack = False
+        self.number_of_52card_decks = 2
+        self.deck = Deck(self.number_of_52card_decks)
+        self.dealer = Dealer()
+        self.player = Player()
+        self.player.bet_input()
 
-    def add_card(self, card):
-        self.cards.append(card)
-        self.count_points()
-        if len(self.cards) == 2 and self.points == 21:
-            self.blackjack = True
+    def play(self):
+        while self.player.bet > 0:            
+            self.first_hand()
+            self.player_move()
 
-    def count_points(self):
-        self.points = sum([self.card_points[card[:-1]] for card in self.cards])
+            if not self.player.busted:
+                self.dealer_move()
 
-        # 'A's value adjusted from 11 to 1 if points > 21
-        for card in self.cards:
-            if 'A' in card and self.points > 21:
-                self.points -= 10
+            self.determine_winner()
+            self.continue_or_exit()
 
-    def show(self):
-        hand_view = ''
-        for card in self.cards:
-            hand_view += '%s%s ' % (card[:-1], self.suits[card[-1]])
-        return hand_view
+        print chr(27) + "[2J"
+        print "Thanks for playing!\n"
 
-    def show_first_card(self):
-        card = self.cards[0]
-        print "Dealer's card: %s%s" % (card[:-1], self.suits[card[-1]]),
+    def first_hand(self):
+        self.player.hand.add_card(self.deck.deal_card())
+        self.player.hand.add_card(self.deck.deal_card())
+        self.dealer.hand.add_card(self.deck.deal_card())
+        self.dealer.hand.add_card(self.deck.deal_card())
+        self.show_table()
+    
+
+    def player_move(self):
+        self.player.check_hand()
+        while self.player.action == 'hit':
+            self.player.hand.add_card(self.deck.deal_card())
+            self.show_table()
+            self.player.check_hand()
+            
+
+    def dealer_move(self):
+        self.show_table()
+        time.sleep(1)
+        self.dealer.dealer_turn = True
+        self.show_table()
+        while self.dealer.hand.points < 17 and not self.dealer.busted:
+            time.sleep(1)
+            self.dealer.hand.add_card(self.deck.deal_card())
+            self.show_table()
+            if self.dealer.hand.points > 21:
+                self.dealer.busted = True
+
+    def determine_winner(self):
+        results = [('You lose!', -1), ('You win!', 1),
+                   ('You win! Blackjack!', 1.5), ('Push.', 0)]
+        if self.player.busted:
+            result, bet_multiplier = results[0]
+        elif self.dealer.busted:
+            result, bet_multiplier = results[1]
+        elif self.player.hand.blackjack and not self.dealer.hand.blackjack:
+            result, bet_multiplier = results[2]
+        elif not self.player.hand.blackjack and self.dealer.hand.blackjack:
+            result, bet_multiplier = results[0]
+        elif self.player.hand.points > self.dealer.hand.points:
+            result, bet_multiplier = results[1]
+        elif self.player.hand.points < self.dealer.hand.points:
+            result, bet_multiplier = results[0]
+        else:
+            result, bet_multiplier = results[3]
+
+        self.player.chips += int(self.player.bet * bet_multiplier)
+        self.close_hand(result)
+
+    def close_hand(self, message):
+        self.player.bet = 0
+        self.show_table(message)
+        self.player.hand = Hand()
+        self.dealer.hand = Hand()
+        self.player.busted = False
+        self.dealer.busted = False
+        self.dealer.dealer_turn = False
+        if len(self.deck.deck) < 52:
+            self.deck = Deck(self.number_of_52card_decks)
+
+    def continue_or_exit(self):
+        if self.player.chips > 0:
+            action = raw_input("Do you want to continue? (y/n) >> ") 
+            if action in ['y', 'yes']:
+                self.player.bet_input()
+            elif action in ['n', 'no']:
+                self.player.bet = 0
+            else:
+                self.continue_or_exit()
+        else:
+            time.sleep(2)
+
+    def show_table(self, message=''):
+        print chr(27) + "[2J"
+        self.player.show_hand()
+        print ''
+        self.dealer.show_hand()
+        print '\n', message, '\n'
+        print "Chips left: %d       " % (self.player.chips - self.player.bet),
+        print "Your bet: %d" % self.player.bet
+        print "--------------------------------"
 
 
 class Deck(object):
@@ -89,7 +154,7 @@ class Player(object):
         print chr(27) + "[2J"
         print "Chips left: ", self.chips
         print "--------------------------------"
-        bet = raw_input("Your bet %s >>> " % message) # !!!! make safe
+        bet = raw_input("Your bet %s >>> " % message)
         self.validate_bet(bet)
 
     def show_hand(self):
@@ -128,118 +193,44 @@ class Dealer(object):
             print "Dealer: %s (%s points)" % \
                   (hand_view, self.hand.points)
         else:
+            # prints only 1st card
             print "Dealer: %s " % hand_view[:3]
 
 
-class Game(object):
-    number_of_52card_decks = 2
+class Hand(object):
+    card_points = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, 
+                   '7': 7, '8': 8, '9': 9, '10': 10, 
+                   'J': 10, 'Q': 10, 'K': 10, 'A': 11}
+
+    suits = {'s': u"\u2660",
+             'h': u"\u2661",
+             'd': u"\u2662",
+             'c': u"\u2663"}
+
     def __init__(self):
-        self.dealer = Dealer()
-        self.player = Player()
-        self.deck = Deck(self.number_of_52card_decks)
-        self.player.bet_input()
+        self.cards = []
+        self.points = 0
+        self.blackjack = False
 
-    def play(self):
-        while self.player.bet > 0:            
-            self.first_hand()
-            self.player_move()
+    def add_card(self, card):
+        self.cards.append(card)
+        self.count_points()
+        if len(self.cards) == 2 and self.points == 21:
+            self.blackjack = True
 
-            if not self.player.busted:
-                self.dealer_move()
+    def count_points(self):
+        self.points = sum([self.card_points[card[:-1]] for card in self.cards])
 
-            self.determine_winner()
-            self.continue_or_exit()
+        # 'A's value adjusted from 11 to 1 if points > 21
+        for card in self.cards:
+            if 'A' in card and self.points > 21:
+                self.points -= 10
 
-        print chr(27) + "[2J"
-        print "Thanks for playing!\n"
-
-    def first_hand(self):
-        self.player.hand.add_card(self.deck.deal_card())
-        self.player.hand.add_card(self.deck.deal_card())
-        self.dealer.hand.add_card(self.deck.deal_card())
-        self.dealer.hand.add_card(self.deck.deal_card())
-        self.show_table()
-    
-
-    def show_table(self, message=''):
-        print chr(27) + "[2J"
-        self.player.show_hand()
-        print ''
-        self.dealer.show_hand()
-        print '\n', message, '\n'
-        print "Chips left: %d       " % (self.player.chips - self.player.bet),
-        print "Your bet: %d" % self.player.bet
-        print "--------------------------------"
-
-    def player_move(self):
-        self.player.check_hand()
-        while self.player.action == 'hit':
-            self.player.hand.add_card(self.deck.deal_card())
-            self.show_table()
-            self.player.check_hand()
-            
-
-    def dealer_move(self):
-        self.show_table()
-        time.sleep(1)
-        self.dealer.dealer_turn = True
-        self.show_table()
-        while self.dealer.hand.points < 17 and not self.dealer.busted:
-            time.sleep(1)
-            self.dealer.hand.add_card(self.deck.deal_card())
-            self.show_table()
-            if self.dealer.hand.points > 21:
-                self.dealer.busted = True
-
-    def determine_winner(self):
-        results = ['You lose!', 'You win!', 'Push.']
-        if self.player.busted:
-            result = results[0]
-            bet_multiplier = -1
-        elif self.dealer.busted:
-            result = results[1]
-            bet_multiplier = 1
-        elif self.player.hand.blackjack and not self.dealer.hand.blackjack:
-            result = results[1]
-            bet_multiplier = 1.5
-        elif not self.player.hand.blackjack and self.dealer.hand.blackjack:
-            result = results[0]
-            bet_multiplier = -1
-        elif self.player.hand.points > self.dealer.hand.points:
-            result = results[1]
-            bet_multiplier = 1
-        elif self.player.hand.points < self.dealer.hand.points:
-            result = results[0]
-            bet_multiplier = -1
-        else:
-            result = results[2]
-            bet_multiplier = 0
-
-        self.player.chips += int(self.player.bet * bet_multiplier)
-        self.close_hand(result)
-
-    def close_hand(self, message):
-        self.player.bet = 0
-        self.show_table(message)
-        self.player.hand = Hand()
-        self.dealer.hand = Hand()
-        self.player.busted = False
-        self.dealer.busted = False
-        self.dealer.dealer_turn = False
-        if len(self.deck.deck) < 52:
-            self.deck = Deck(self.number_of_52card_decks)
-
-    def continue_or_exit(self):
-        if self.player.chips > 0:
-            action = raw_input("Do you want to continue? (y/n) >> ") 
-            if action in ['y', 'yes']:
-                self.player.bet_input()
-            elif action in ['n', 'no']:
-                self.player.bet = 0
-            else:
-                self.continue_or_exit()
-        else:
-            time.sleep(2)
+    def show(self):
+        hand_view = ''
+        for card in self.cards:
+            hand_view += '%s%s ' % (card[:-1], self.suits[card[-1]])
+        return hand_view
 
 
 if __name__ == "__main__":
