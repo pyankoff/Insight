@@ -16,10 +16,13 @@ class Hand(object):
     def __init__(self):
         self.cards = []
         self.points = 0
+        self.blackjack = False
 
     def add_card(self, card):
         self.cards.append(card)
         self.count_points()
+        if len(self.cards) == 2 and self.points == 21:
+            self.blackjack = True
 
     def count_points(self):
         self.points = sum([self.card_points[card[:-1]] for card in self.cards])
@@ -58,7 +61,6 @@ class Deck(object):
 
 
     def shuffle(self):
-        print "Shuffling the deck..."
         self.deck = self.initialize_deck()
         random.shuffle(self.deck)
 
@@ -130,10 +132,11 @@ class Dealer(object):
 
 
 class Game(object):
+    number_of_52card_decks = 2
     def __init__(self):
         self.dealer = Dealer()
         self.player = Player()
-        self.deck = Deck(number_of_52card_decks=2)
+        self.deck = Deck(self.number_of_52card_decks)
         self.player.bet_input()
 
     def play(self):
@@ -189,15 +192,31 @@ class Game(object):
                 self.dealer.busted = True
 
     def determine_winner(self):
-        if self.player.busted or (not self.dealer.busted and\
-                    self.player.hand.points <= self.dealer.hand.points):
-            self.player.chips -= self.player.bet
-            message = 'You lost!'
+        results = ['You lose!', 'You win!', 'Push.']
+        if self.player.busted:
+            result = results[0]
+            bet_multiplier = -1
+        elif self.dealer.busted:
+            result = results[1]
+            bet_multiplier = 1
+        elif self.player.hand.blackjack and not self.dealer.hand.blackjack:
+            result = results[1]
+            bet_multiplier = 1.5
+        elif not self.player.hand.blackjack and self.dealer.hand.blackjack:
+            result = results[0]
+            bet_multiplier = -1
+        elif self.player.hand.points > self.dealer.hand.points:
+            result = results[1]
+            bet_multiplier = 1
+        elif self.player.hand.points < self.dealer.hand.points:
+            result = results[0]
+            bet_multiplier = -1
         else:
-            self.player.chips += self.player.bet
-            message = 'You won!'
+            result = results[2]
+            bet_multiplier = 0
 
-        self.close_hand(message)
+        self.player.chips += int(self.player.bet * bet_multiplier)
+        self.close_hand(result)
 
     def close_hand(self, message):
         self.player.bet = 0
@@ -207,6 +226,8 @@ class Game(object):
         self.player.busted = False
         self.dealer.busted = False
         self.dealer.dealer_turn = False
+        if len(self.deck.deck) < 52:
+            self.deck = Deck(self.number_of_52card_decks)
 
     def continue_or_exit(self):
         if self.player.chips > 0:
